@@ -28,6 +28,8 @@ import { cloudfrontPath } from 'src/modules/cloudfront';
 import { SellerFileRepository } from 'src/repository/sellerFile.repository';
 import { SellerMinorFileRepository } from 'src/repository/sellerMinorFile.repository';
 import { TemporaryProductRepository } from 'src/repository/temporaryProduct.repository';
+import { SellerHashtagRepository } from 'src/repository/sellerHashtag.repository';
+import { SellerHashTag } from 'src/entity/SellerHashTag.entity';
 
 @Injectable()
 export class AuthService {
@@ -40,6 +42,7 @@ export class AuthService {
         private sellerPopbillAccountRepository: SellerPopbillAccountRepository,
         private sellerFileRepository: SellerFileRepository,
         private sellerMinorFileRepository: SellerMinorFileRepository,
+        private sellerHashtagRepository: SellerHashtagRepository,
         private temporaryProductRepository: TemporaryProductRepository,
     ) {}
 
@@ -53,11 +56,10 @@ export class AuthService {
             const checkEmail = await this.sellerRepository.checkEmail(email);
             const checkPhone = await this.sellerRepository.checkPhone(phone);
             const checkBankAccount = await this.sellerRepository.checkBankAccount(bankAccount);
-
             if (checkEmail) {
                 status = 201;
                 resultCode = 6001;
-            } else if (checkPhone != null) {
+            } else if (checkPhone) {
                 status = 202;
                 resultCode = 6002;
             } else if (checkBankAccount) {
@@ -66,20 +68,16 @@ export class AuthService {
             } else {
                 if (businessOption == BusinessOption.personal) {
                     await this.personalRegister(body);
-
                     const mail = await this.mailChimpService.registerTemplate(name, email);
                     Logger.log(mail === 'sent' ? 'Register MailChimp Success' : 'Register MailChimp Fail');
                 } else {
                     await this.businessRegister(body);
-
                     const mail = await this.mailChimpService.registerTemplate(name, email);
                     Logger.log(mail === 'sent' ? 'Register MailChimp Success' : 'Register MailChimp Fail');
                 }
-
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -95,20 +93,16 @@ export class AuthService {
             let resultCode = 0;
             const { name, email, phone } = body;
             const checkPhone = await this.sellerRepository.checkPhone(phone);
-
             if (checkPhone != null) {
                 status = 203;
                 resultCode = 6007;
             } else {
                 await this.englishRegister(body);
-
                 const mail = await this.mailChimpService.enRegisterTemplate(name, email);
                 Logger.log(mail === 'sent' ? 'Register MailChimp Success' : 'Register MailChimp Fail');
-
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -122,7 +116,6 @@ export class AuthService {
             let data = null;
             let status = 0;
             const checkIsEmailExisted = await this.sellerRepository.checkEmail(body);
-
             if (checkIsEmailExisted) {
                 status = 201;
                 resultCode = 6006;
@@ -130,14 +123,12 @@ export class AuthService {
                 const emailRes = await this.mailService.sendEmail(body);
                 const code = emailRes;
                 data = null;
-
                 if (code !== null && code !== '') {
                     status = 200;
                     resultCode = 1;
                     data = code;
                 }
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -153,18 +144,15 @@ export class AuthService {
             let data = null;
             const { email, password } = body;
             const seller = await this.sellerRepository.findByEmail(email);
-
             if (seller === undefined) {
                 return { status: 201, resultCode: 6011, data: null };
             }
-
             const sellerId = seller.id;
             const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
             const hashPassword = GenDigestPwd(password);
             const sellerJwtSecret = process.env.SELLER_JWT_SECRET_KEY;
             const accessToken = jwt.sign({ sellerId }, sellerJwtSecret, { expiresIn: '1h' });
             const refreshToken = jwt.sign({ sellerId }, sellerJwtSecret, { expiresIn: '1d' });
-
             if (seller.password != hashPassword) {
                 status = 202;
                 resultCode = 6012;
@@ -196,7 +184,6 @@ export class AuthService {
                 status = 200;
                 resultCode = 1; // 승인된 계정
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -215,7 +202,6 @@ export class AuthService {
             const englishBrandNameCheck = await this.sellerRepository.checkEnglishBrandName(
                 englishBrandName,
             );
-
             if (brandNameCheck) {
                 status = 201;
                 resultCode = 6021;
@@ -227,7 +213,6 @@ export class AuthService {
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -982,10 +967,18 @@ export class AuthService {
     }
 
     async addSellerInfo(files: File[], body: any): Promise<any> {
-        const { sellerId, brandName, englishBrandName, brandStory, englishBrandStory } = body;
+        const {
+            sellerId,
+            brandName,
+            englishBrandName,
+            brandStory,
+            englishBrandStory,
+            hashTag,
+            instagram,
+            twitter,
+        } = body;
         const seller = await this.sellerRepository.getSeller(sellerId);
         const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-
         if (sellerInfo.sellerType === SellerType.underage) {
             const sellerMinor = await this.sellerMinorFileRepository.create();
             sellerMinor.certificateOriginalName = files['legalRepresentCertificate'][0].key;
@@ -1001,11 +994,40 @@ export class AuthService {
             sellerFile.seller = seller;
             await this.sellerFileRepository.save(sellerFile);
         }
-
         seller.status = SellerStatus.registered;
         await this.sellerRepository.save(seller);
-
-        sellerInfo.brandImage = cloudfrontPath(files['profile'][0].key);
+        await this.sellerHashtagRepository.delete(sellerId);
+        if (hashTag) {
+            if (Array.isArray(hashTag)) {
+                hashTag.forEach(async (o) => {
+                    let sellerHashtag = this.sellerHashtagRepository.create();
+                    sellerHashtag.name = o;
+                    sellerHashtag.seller = seller;
+                    await this.sellerHashtagRepository.save(sellerHashtag);
+                });
+            } else {
+                let sellerHashtag = this.sellerHashtagRepository.create();
+                sellerHashtag.name = hashTag;
+                sellerHashtag.seller = seller;
+                await this.sellerHashtagRepository.save(sellerHashtag);
+            }
+        }
+        if (instagram) {
+            sellerInfo.instagram = instagram;
+        } else {
+            sellerInfo.instagram = null;
+        }
+        if (twitter) {
+            sellerInfo.twitter = twitter;
+        } else {
+            sellerInfo.twitter = null;
+        }
+        if (files['profile']) {
+            sellerInfo.brandImage = cloudfrontPath(files['profile'][0].key);
+        }
+        if (files['backProfile']) {
+            sellerInfo.brandBackgroundImage = cloudfrontPath(files['backProfile'][0].key);
+        }
         sellerInfo.brandName = brandName;
         sellerInfo.englishBrandName = englishBrandName;
         sellerInfo.brandStory = brandStory;
@@ -1014,14 +1036,40 @@ export class AuthService {
     }
 
     async addEnglishSellerInfo(files: File[], body: any): Promise<any> {
-        const { sellerId, englishBrandName, englishBrandStory } = body;
+        const { sellerId, englishBrandName, englishBrandStory, hashTag, instagram, twitter } = body;
         const seller = await this.sellerRepository.getSeller(sellerId);
         const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-
         seller.status = SellerStatus.registered;
         await this.sellerRepository.save(seller);
-
-        sellerInfo.brandImage = cloudfrontPath(files['profile'][0].key);
+        await this.sellerHashtagRepository.delete(sellerId);
+        if (hashTag) {
+            if (Array.isArray(hashTag)) {
+                hashTag.forEach(async (o) => {
+                    let sellerHashtag = this.sellerHashtagRepository.create();
+                    sellerHashtag.name = o;
+                    sellerHashtag.seller = seller;
+                    await this.sellerHashtagRepository.save(sellerHashtag);
+                });
+            } else {
+                let sellerHashtag = this.sellerHashtagRepository.create();
+                sellerHashtag.name = hashTag;
+                sellerHashtag.seller = seller;
+                await this.sellerHashtagRepository.save(sellerHashtag);
+            }
+        }
+        if (instagram) {
+            sellerInfo.instagram = instagram;
+        } else {
+            sellerInfo.instagram = null;
+        }
+        if (twitter) {
+            sellerInfo.twitter = twitter;
+        } else {
+            sellerInfo.twitter = null;
+        }
+        if (files['profile']) {
+            sellerInfo.brandImage = cloudfrontPath(files['profile'][0].key);
+        }
         sellerInfo.brandName = englishBrandName;
         sellerInfo.englishBrandName = englishBrandName;
         sellerInfo.brandStory = englishBrandStory;

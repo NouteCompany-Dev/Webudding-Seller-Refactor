@@ -222,121 +222,121 @@ export class ProductsController {
         }
     }
 
-    @Patch('en/:id')
-    @ApiBearerAuth('seller-auth')
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileFieldsInterceptor([{ name: 'thumbGlobal' }, { name: 'sale' }], fileUpload))
-    @ApiOperation({ summary: '해외 셀러 상품 수정' })
-    @ApiResponse({ status: 200, type: ResultSuccessDto, description: '해외 셀러 상품 수정 성공' })
-    @ApiResponse({ status: 400, type: ResultFailDto, description: '요청 값 에러' })
-    @ApiResponse({
-        status: 401,
-        type: UpdateEnglishProductFailDto,
-        description: '해외 셀러 상품 수정 실패',
-    })
-    async enUpdate(
-        @UploadedFiles() files: File[],
-        @Req() req: any,
-        @Param('id', ParseIntPipe) id: any,
-        @Body() data: UpdateEnglishProductReqDto,
-        @Res() res: Response,
-    ) {
-        Logger.log('API - English Product Update');
-        try {
-            const result = await this.productService.enUpdate(files, req, id, data);
-            res.status(200).json(result);
-        } catch (err) {
-            console.log(err);
-            res.status(400).json({ resultCode: -1, data: null });
-        }
-    }
-
-    @Post('temp')
-    @ApiBearerAuth('seller-auth')
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(
-        FileFieldsInterceptor([{ name: 'thumb' }, { name: 'thumbGlobal' }, { name: 'sale' }], fileUpload),
-    )
-    @ApiOperation({ summary: '상품 임시저장' })
-    @ApiResponse({ status: 200, type: ResultSuccessDto, description: '상품 임시저장 성공' })
-    @ApiResponse({ status: 400, type: ResultFailDto, description: '요청 값 에러' })
-    @ApiResponse({ status: 401, type: ProductTempFailDto, description: '상품 임시저장 실패' })
-    async temp(
-        @UploadedFiles() files: File[],
-        @Req() req: any,
-        @Body() data: TempProductReqDto,
-        @Res() res: Response,
-    ) {
-        Logger.log('API - Product Temporary Save');
-        try {
-            const result = await this.productService.temp(files, req, data);
-            res.status(200).json(result);
-        } catch (err) {
-            console.log(err);
-            res.status(400).json({ resultCode: -1, data: null });
-        }
-    }
-
-    // @Post('price')
+    // @Patch('en/:id')
     // @ApiBearerAuth('seller-auth')
-    // @ApiOperation({ summary: '상품 가격 수정' })
-    // @ApiResponse({ status: 200, type: ResultSuccessDto, description: '상품 가격 수정 성공' })
+    // @ApiConsumes('multipart/form-data')
+    // @UseInterceptors(FileFieldsInterceptor([{ name: 'thumbGlobal' }, { name: 'sale' }], fileUpload))
+    // @ApiOperation({ summary: '해외 셀러 상품 수정' })
+    // @ApiResponse({ status: 200, type: ResultSuccessDto, description: '해외 셀러 상품 수정 성공' })
     // @ApiResponse({ status: 400, type: ResultFailDto, description: '요청 값 에러' })
-    // @ApiResponse({ status: 401, type: UpdateProductPriceFailDto, description: '상품 가격 수정 실패' })
-    // async updatePrice(@Req() req: any, @Body() body: UpdateProductPriceReqDto, @Res() res: Response) {
-    //     Logger.log('API - Product Price Update')
+    // @ApiResponse({
+    //     status: 401,
+    //     type: UpdateEnglishProductFailDto,
+    //     description: '해외 셀러 상품 수정 실패',
+    // })
+    // async enUpdate(
+    //     @UploadedFiles() files: File[],
+    //     @Req() req: any,
+    //     @Param('id', ParseIntPipe) id: any,
+    //     @Body() data: UpdateEnglishProductReqDto,
+    //     @Res() res: Response,
+    // ) {
+    //     Logger.log('API - English Product Update');
     //     try {
-    //         const result = await this.productService.updatePrice(req, body);
+    //         const result = await this.productService.enUpdate(files, req, id, data);
     //         res.status(200).json(result);
     //     } catch (err) {
     //         console.log(err);
-    //         res.status(400).json({ "resultCode": -1, "data": null });
+    //         res.status(400).json({ resultCode: -1, data: null });
     //     }
     // }
 
-    // @Get('sync/price')
-    // async syncPrice(@Req() req: any, @Res() res: Response) {
+    // @Post('temp')
+    // @ApiBearerAuth('seller-auth')
+    // @ApiConsumes('multipart/form-data')
+    // @UseInterceptors(
+    //     FileFieldsInterceptor([{ name: 'thumb' }, { name: 'thumbGlobal' }, { name: 'sale' }], fileUpload),
+    // )
+    // @ApiOperation({ summary: '상품 임시저장' })
+    // @ApiResponse({ status: 200, type: ResultSuccessDto, description: '상품 임시저장 성공' })
+    // @ApiResponse({ status: 400, type: ResultFailDto, description: '요청 값 에러' })
+    // @ApiResponse({ status: 401, type: ProductTempFailDto, description: '상품 임시저장 실패' })
+    // async temp(
+    //     @UploadedFiles() files: File[],
+    //     @Req() req: any,
+    //     @Body() data: TempProductReqDto,
+    //     @Res() res: Response,
+    // ) {
+    //     Logger.log('API - Product Temporary Save');
     //     try {
-    //         const result = await this.productService.priceSync(req);
-    //         return result;
+    //         const result = await this.productService.temp(files, req, data);
+    //         res.status(200).json(result);
     //     } catch (err) {
     //         console.log(err);
+    //         res.status(400).json({ resultCode: -1, data: null });
     //     }
     // }
 
-    @Post('test')
-    @ApiBearerAuth('seller-auth')
-    @UseInterceptors(
-        FileFieldsInterceptor([{ name: 'thumb' }, { name: 'thumbGlobal' }, { name: 'sale' }], fileUpload),
-    )
-    @ApiConsumes('multipart/form-data')
-    @ApiOperation({ summary: '상품 파일 테스트 등록' })
-    async testCreate(
-        @UploadedFiles() files: File[],
-        @Body() body: any,
-        @Res() res: Response,
-    ): Promise<any> {
-        Logger.log('API - Seller Upload Product Test');
-        try {
-            const result = await this.productService.fileTest(files, body);
-            res.status(200).json(result);
-        } catch (err) {
-            console.log(err);
-            res.status(400).json({ resultCode: -1, data: null });
-        }
-    }
+    // // @Post('price')
+    // // @ApiBearerAuth('seller-auth')
+    // // @ApiOperation({ summary: '상품 가격 수정' })
+    // // @ApiResponse({ status: 200, type: ResultSuccessDto, description: '상품 가격 수정 성공' })
+    // // @ApiResponse({ status: 400, type: ResultFailDto, description: '요청 값 에러' })
+    // // @ApiResponse({ status: 401, type: UpdateProductPriceFailDto, description: '상품 가격 수정 실패' })
+    // // async updatePrice(@Req() req: any, @Body() body: UpdateProductPriceReqDto, @Res() res: Response) {
+    // //     Logger.log('API - Product Price Update')
+    // //     try {
+    // //         const result = await this.productService.updatePrice(req, body);
+    // //         res.status(200).json(result);
+    // //     } catch (err) {
+    // //         console.log(err);
+    // //         res.status(400).json({ "resultCode": -1, "data": null });
+    // //     }
+    // // }
 
-    @Get('upload/s3')
-    @UseInterceptors(FileFieldsInterceptor([{ name: 'thumb' }], fileUpload))
-    @ApiConsumes('multipart/form-data')
-    async uploadS3(@UploadedFiles() files: File[], @Res() res: Response): Promise<any> {
-        Logger.log('API - S3 File Upload');
-        try {
-            const result = await this.productService.uploadS3(files);
-            res.status(200).json(result);
-        } catch (err) {
-            console.log(err);
-            res.status(400).json({ resultCode: -1, data: null });
-        }
-    }
+    // // @Get('sync/price')
+    // // async syncPrice(@Req() req: any, @Res() res: Response) {
+    // //     try {
+    // //         const result = await this.productService.priceSync(req);
+    // //         return result;
+    // //     } catch (err) {
+    // //         console.log(err);
+    // //     }
+    // // }
+
+    // @Post('test')
+    // @ApiBearerAuth('seller-auth')
+    // @UseInterceptors(
+    //     FileFieldsInterceptor([{ name: 'thumb' }, { name: 'thumbGlobal' }, { name: 'sale' }], fileUpload),
+    // )
+    // @ApiConsumes('multipart/form-data')
+    // @ApiOperation({ summary: '상품 파일 테스트 등록' })
+    // async testCreate(
+    //     @UploadedFiles() files: File[],
+    //     @Body() body: any,
+    //     @Res() res: Response,
+    // ): Promise<any> {
+    //     Logger.log('API - Seller Upload Product Test');
+    //     try {
+    //         const result = await this.productService.fileTest(files, body);
+    //         res.status(200).json(result);
+    //     } catch (err) {
+    //         console.log(err);
+    //         res.status(400).json({ resultCode: -1, data: null });
+    //     }
+    // }
+
+    // @Get('upload/s3')
+    // @UseInterceptors(FileFieldsInterceptor([{ name: 'thumb' }], fileUpload))
+    // @ApiConsumes('multipart/form-data')
+    // async uploadS3(@UploadedFiles() files: File[], @Res() res: Response): Promise<any> {
+    //     Logger.log('API - S3 File Upload');
+    //     try {
+    //         const result = await this.productService.uploadS3(files);
+    //         res.status(200).json(result);
+    //     } catch (err) {
+    //         console.log(err);
+    //         res.status(400).json({ resultCode: -1, data: null });
+    //     }
+    // }
 }

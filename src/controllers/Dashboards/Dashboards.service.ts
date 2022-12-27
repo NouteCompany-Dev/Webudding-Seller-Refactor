@@ -75,10 +75,8 @@ export class DashboardsService {
         let graphMonth = null;
         let nowYear = new Date().getFullYear();
         let stringYear = null;
-
         for (let i = 10; i > 0; i--) {
             let month = nowMonth + 1 - i;
-
             if (month > 0) {
                 month = month;
                 nowYear = nowYear;
@@ -90,28 +88,23 @@ export class DashboardsService {
                 stringYear = nowYear.toString();
                 stringYear = stringYear.substr(2, 4);
             }
-
             if (month < 10) {
                 graphMonth = stringYear + '/0' + month;
             } else {
                 graphMonth = stringYear + '/' + month;
             }
-
             let startDateString = new Date(nowYear, month - 1, 1);
             let endDateString = new Date(nowYear, month, 0);
             let startDate = format(startDateString, 'yyyy-MM-dd');
             let endDate = format(endDateString, 'yyyy-MM-dd');
             let getOptions = { sellerId, startDate, endDate };
             let saleData = await this.orderProductRepository.getTotalSaleData(getOptions);
-
             graphSaleData = {
                 data: graphMonth,
                 count: saleData.length,
             };
-
             graphData.push(graphSaleData);
         }
-
         return graphData;
     }
 

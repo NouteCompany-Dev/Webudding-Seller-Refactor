@@ -65,7 +65,7 @@ export class ProductThumbRepository {
             .getMany();
     }
 
-    async getManyGlobalThumbS(body: any): Promise<any> {
+    async getManyGlobalThumbs(body: any): Promise<any> {
         return await this.productThumbRepository
             .createQueryBuilder('pt')
             .where('pt.productId = :productId', { productId: body })

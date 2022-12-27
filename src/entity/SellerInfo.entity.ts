@@ -4,7 +4,6 @@ import {
     Entity,
     JoinColumn,
     OneToOne,
-    PrimaryColumn,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
@@ -49,6 +48,9 @@ export class SellerInfo {
 
     @Column({ length: 255, nullable: true })
     brandImage: string;
+
+    @Column({ length: 255, nullable: true })
+    brandBackgroundImage: string;
 
     @Column({ length: 30, nullable: true })
     bankName: string;

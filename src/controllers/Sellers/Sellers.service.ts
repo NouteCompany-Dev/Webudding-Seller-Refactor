@@ -1,9 +1,7 @@
-import { SellerLedgerRepository } from 'src/repository/SellerLedger.repository';
 import { UpdateToCorpReqDto, UpdateToPersonalReqDto } from './dto/req/UpdateSellerTypeReq.dto';
 import { Injectable, Logger } from '@nestjs/common';
 import { GenDigestPwd, aesEncrypt } from 'src/lib/crypto';
 import { cloudfrontPath } from 'src/modules/cloudfront';
-import { Connection } from 'typeorm';
 import {
     UpdateSellerReqDto,
     UpdateBrandReqDto,
@@ -13,7 +11,7 @@ import {
 } from './dto/req/UpdateSellersReq.dto';
 import { FindSellerEmailReqDto, FindSellerPasswordReqDto } from './dto/req/FindSellerInfoReq.dto';
 import * as dotenv from 'dotenv';
-import { BusinessOption, Currency, LedgerStatus } from 'src/entity/enum/enum';
+import { BusinessOption } from 'src/entity/enum/enum';
 import { SellerRepository } from 'src/repository/Seller.repository';
 import { SellerInfoRepository } from 'src/repository/sellerInfo.repository';
 import { SellerPopbillAccountRepository } from 'src/repository/sellerPopbillAccount.repository';
@@ -22,18 +20,18 @@ import { CategoryRepository } from 'src/repository/Category.repository';
 import { SellerFileRepository } from 'src/repository/sellerFile.repository';
 import { BaroBillReqDto, DanalReqDto } from '../Auth/dto/req/ThirdPartyReq.dto';
 import axios from 'axios';
+import { SellerHashtagRepository } from 'src/repository/sellerHashtag.repository';
 dotenv.config();
 
 @Injectable()
 export class SellersService {
     constructor(
-        private connection: Connection,
         // Repository
         private sellerRepository: SellerRepository,
         private sellerInfoRepository: SellerInfoRepository,
         private sellerPopbillAccountRepository: SellerPopbillAccountRepository,
         private sellerFileRepository: SellerFileRepository,
-        private sellerLedgerRepository: SellerLedgerRepository,
+        private sellerHashtagRepository: SellerHashtagRepository,
         private categoryRepository: CategoryRepository,
         private temporaryProductRepository: TemporaryProductRepository,
     ) {}
@@ -46,7 +44,6 @@ export class SellersService {
             let data = null;
             const sellerId = req.seller.sellerId;
             const seller = await this.sellerPopbillAccountRepository.getSellerPopbillAccount(sellerId);
-
             if (seller == undefined) {
                 status = 201;
                 resultCode = 6101;
@@ -55,7 +52,6 @@ export class SellersService {
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -71,7 +67,6 @@ export class SellersService {
             let data = null;
             const sellerId = req.seller.sellerId;
             const seller = await this.sellerRepository.getSeller(sellerId);
-
             if (seller == undefined) {
                 status = 201;
                 resultCode = 6103;
@@ -80,7 +75,6 @@ export class SellersService {
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -101,36 +95,31 @@ export class SellersService {
             const pass = seller.password;
             let encryptPhoneNumber = await this.sellerRepository.encryptPhone(phone);
             let hashPassword = GenDigestPwd(password);
-
             if (hashPassword != pass) {
                 status = 201;
                 resultCode = 6111;
             } else {
-                await this.connection.transaction(async (manager) => {
-                    if (newPassword !== null) {
-                        let hashNewPassword = GenDigestPwd(newPassword);
-                        seller.password = hashNewPassword;
+                if (newPassword !== null) {
+                    let hashNewPassword = GenDigestPwd(newPassword);
+                    seller.password = hashNewPassword;
+                }
+                if (residentNumber) {
+                    if (seller.registType == true) {
+                        let dencryptResidentNumber = await this.sellerRepository.dencryptResidentNumber(
+                            residentNumber,
+                        );
+                        sellerInfo.residentNumber =
+                            typeof dencryptResidentNumber === 'string' ? dencryptResidentNumber : '';
+                    } else {
+                        sellerInfo.residentNumber = residentNumber;
                     }
-                    if (residentNumber) {
-                        if (seller.registType == true) {
-                            let dencryptResidentNumber = await this.sellerRepository.dencryptResidentNumber(
-                                residentNumber,
-                            );
-                            sellerInfo.residentNumber =
-                                typeof dencryptResidentNumber === 'string' ? dencryptResidentNumber : '';
-                        } else {
-                            sellerInfo.residentNumber = residentNumber;
-                        }
-                    }
-                    seller.email = email;
-                    seller.phone = typeof encryptPhoneNumber === 'string' ? encryptPhoneNumber : '';
-                    await manager.save(seller);
-                });
-
+                }
+                seller.email = email;
+                seller.phone = typeof encryptPhoneNumber === 'string' ? encryptPhoneNumber : '';
+                await this.sellerRepository.save(seller);
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -150,35 +139,27 @@ export class SellersService {
             const pass = seller.password;
             let encryptPhoneNumber = await this.sellerRepository.encryptPhone(phone);
             let hashPassword = GenDigestPwd(password);
-
             if (hashPassword != pass) {
                 status = 201;
                 resultCode = 6113;
             } else {
-                await this.connection.transaction(async (manager) => {
-                    const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-
-                    if (newPassword !== null) {
-                        let hashNewPassword = GenDigestPwd(newPassword);
-                        seller.password = hashNewPassword;
-                    }
-
-                    seller.email = email;
-
-                    if (!verifyCode) {
-                        status = 202;
-                        resultCode = 6114;
-                    }
-
-                    seller.phone = typeof encryptPhoneNumber === 'string' ? encryptPhoneNumber : '';
-                    sellerInfo.name = name;
-                    await manager.save(seller);
-                    await manager.save(sellerInfo);
-                });
+                const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
+                if (newPassword !== null) {
+                    let hashNewPassword = GenDigestPwd(newPassword);
+                    seller.password = hashNewPassword;
+                }
+                seller.email = email;
+                if (!verifyCode) {
+                    status = 202;
+                    resultCode = 6114;
+                }
+                seller.phone = typeof encryptPhoneNumber === 'string' ? encryptPhoneNumber : '';
+                sellerInfo.name = name;
+                await this.sellerRepository.save(seller);
+                await this.sellerInfoRepository.save(sellerInfo);
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -194,28 +175,15 @@ export class SellersService {
             let data = null;
             const sellerId = req.seller.sellerId;
             const { brandStory, englishBrandStory } = body;
-            const seller = await this.sellerRepository.getSeller(sellerId);
-
-            if (!seller) {
-                status = 201;
-                resultCode = 6121;
-            } else {
-                await this.connection.transaction(async (manager) => {
-                    const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-                    sellerInfo.brandStory = brandStory;
-                    sellerInfo.englishBrandStory = englishBrandStory;
-
-                    if (files['profile']) {
-                        sellerInfo.brandImage = cloudfrontPath(files['profile'][0].key);
-                    }
-
-                    await manager.save(sellerInfo);
-                });
-
-                status = 200;
-                resultCode = 1;
+            const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
+            sellerInfo.brandStory = brandStory;
+            sellerInfo.englishBrandStory = englishBrandStory;
+            if (files['profile']) {
+                sellerInfo.brandImage = cloudfrontPath(files['profile'][0].key);
             }
-
+            await this.sellerInfoRepository.save(sellerInfo);
+            status = 200;
+            resultCode = 1;
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -231,26 +199,14 @@ export class SellersService {
             let data = null;
             const sellerId = req.seller.sellerId;
             const { bankName, bankAccount, depositor } = body;
-            const seller = await this.sellerRepository.getSeller(sellerId);
             let encryptAccountNumber = await this.sellerRepository.encryptBankAccount(bankAccount);
-
-            if (!seller) {
-                status = 201;
-                resultCode = 6131;
-            } else {
-                await this.connection.transaction(async (manager) => {
-                    const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-                    sellerInfo.bankName = bankName;
-                    sellerInfo.bankAccount =
-                        typeof encryptAccountNumber === 'string' ? encryptAccountNumber : '';
-                    sellerInfo.depositor = depositor;
-                    await manager.save(sellerInfo);
-                });
-
-                status = 200;
-                resultCode = 1;
-            }
-
+            const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
+            sellerInfo.bankName = bankName;
+            sellerInfo.bankAccount = typeof encryptAccountNumber === 'string' ? encryptAccountNumber : '';
+            sellerInfo.depositor = depositor;
+            await this.sellerInfoRepository.save(sellerInfo);
+            status = 200;
+            resultCode = 1;
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -266,18 +222,13 @@ export class SellersService {
             let data = null;
             const sellerId = req.seller.sellerId;
             const { name, ledgerType, ledgerEmail } = body;
-
-            await this.connection.transaction(async (manager) => {
-                const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-                sellerInfo.name = name;
-                sellerInfo.ledgerType = ledgerType;
-                sellerInfo.ledgerEmail = ledgerEmail;
-                await manager.save(sellerInfo);
-            });
-
+            const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
+            sellerInfo.name = name;
+            sellerInfo.ledgerType = ledgerType;
+            sellerInfo.ledgerEmail = ledgerEmail;
+            await this.sellerInfoRepository.save(sellerInfo);
             status = 200;
             resultCode = 1;
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -293,47 +244,41 @@ export class SellersService {
             let data = null;
             let { corNum, representativeName, businessName } = body;
             const sellerId = req.seller.sellerId;
-
-            await this.connection.transaction(async (manager) => {
-                const seller = await this.sellerRepository.getSeller(sellerId);
-                const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-                const sellerPopbillAccount =
-                    await this.sellerPopbillAccountRepository.getSellerPopbillAccount(sellerId);
-                sellerPopbillAccount.representativeName = representativeName;
-                sellerPopbillAccount.businessName = businessName;
-                await manager.save(sellerPopbillAccount);
-
-                sellerInfo.businessOption = BusinessOption.business;
-                sellerInfo.businessNumber = corNum;
-                sellerInfo.residentNumber = null;
-                sellerInfo.popbillChecked = true;
-                await manager.save(sellerInfo);
-
-                let taxTypeData = await this.getCorpState({ corNum });
-                let taxType = taxTypeData.data.taxType;
-
-                if (taxType == 3) {
-                    if (!files['sellerFile']) {
-                        status = 201;
-                        resultCode = 6141;
-                    } else {
-                        files['sellerFile'].forEach(async (o) => {
-                            let sellerFile = await this.sellerFileRepository.create();
-                            sellerFile.certificateOriginalName = o.key;
-                            sellerFile.certificatePath = cloudfrontPath(o.key);
-                            sellerFile.seller = seller;
-                            await manager.save(sellerFile);
-                        });
-
-                        status = 200;
-                        resultCode = 1;
-                    }
+            const seller = await this.sellerRepository.getSeller(sellerId);
+            const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
+            const sellerPopbillAccount = await this.sellerPopbillAccountRepository.getSellerPopbillAccount(
+                sellerId,
+            );
+            sellerPopbillAccount.representativeName = representativeName;
+            sellerPopbillAccount.businessName = businessName;
+            await this.sellerPopbillAccountRepository.save(sellerPopbillAccount);
+            sellerInfo.businessOption = BusinessOption.business;
+            sellerInfo.businessNumber = corNum;
+            sellerInfo.residentNumber = null;
+            sellerInfo.popbillChecked = true;
+            await this.sellerInfoRepository.save(sellerInfo);
+            let taxTypeData = await this.getCorpState({ corNum });
+            let taxType = taxTypeData.data.taxType;
+            if (taxType == 3) {
+                if (!files['sellerFile']) {
+                    status = 201;
+                    resultCode = 6141;
                 } else {
+                    files['sellerFile'].forEach(async (o) => {
+                        let sellerFile = await this.sellerFileRepository.create();
+                        sellerFile.certificateOriginalName = o.key;
+                        sellerFile.certificatePath = cloudfrontPath(o.key);
+                        sellerFile.seller = seller;
+                        await this.sellerFileRepository.save(sellerFile);
+                    });
+
                     status = 200;
                     resultCode = 1;
                 }
-            });
-
+            } else {
+                status = 200;
+                resultCode = 1;
+            }
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -350,21 +295,17 @@ export class SellersService {
             const { residentNumber } = body;
             const sellerId = req.seller.sellerId;
             const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-
             if (!residentNumber) {
                 status = 201;
                 resultCode = 6151;
             }
-
             if (sellerInfo.businessOption == BusinessOption.business) {
                 await this.businessSellerUpdateToPersonal(req, body);
             } else {
                 await this.personalSellerUpdateToPersonal(req, body);
             }
-
             status = 200;
             resultCode = 1;
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -384,9 +325,7 @@ export class SellersService {
             const phone = phoneCheck.data.result.phone;
             const phone_num = aesEncrypt(phone);
             const sellerCheck = await this.sellerRepository.checkPhone(phone_num);
-            console.log(sellerCheck);
             let email = sellerCheck.email;
-
             if (!phoneCheck) {
                 status = 201;
                 resultCode = 6161;
@@ -400,7 +339,6 @@ export class SellersService {
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
@@ -416,7 +354,6 @@ export class SellersService {
             let data = null;
             const { email, newPassword } = body;
             const seller = await this.sellerRepository.getSellerAndEmail(email);
-
             if (!seller) {
                 status = 201;
                 resultCode = 6171;
@@ -424,150 +361,13 @@ export class SellersService {
                 seller.email = email;
                 seller.password = GenDigestPwd(newPassword);
                 await this.sellerRepository.save(seller);
-
                 status = 200;
                 resultCode = 1;
             }
-
             return { status: status, resultCode: resultCode, data: data };
         } catch (err) {
             console.log(err);
             return { stauts: 401, resultCode: 6172, data: null };
-        }
-    }
-
-    async groupingSeller(req: any): Promise<any> {
-        try {
-            // let data = [];
-            // const row = await getRepository(SellerGroup).createQueryBuilder('sg')
-            //     .leftJoinAndSelect('sg.seller', 'sgs')
-            //     .leftJoinAndSelect('sgs.sellerInfo', 'si')
-            //     .getMany();
-            // const bRow = await this.sellerInfoRepository.getSellerInfoList();
-            // let char = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
-            // let char2 = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
-            // let res = "";
-            // let koCode = null;
-            // let enCode = null;
-            // const enRegex = /^[a-z|A-Z]+$/;
-            // const koRegex = /^[ㄱ-ㅎ|가-힣]+$/;
-            // const numRegex = /[0-9]/g;
-            // for(let i = 0; i < bRow.length; i++) {
-            //     if(bRow[i].brandName != null && bRow[i].brandName != "") {
-            //         let koBrandName = bRow[i].brandName;
-            //         koCode = koBrandName.charCodeAt(0) - 44032;
-            //         if(koCode > -1 && koCode < 11172) {
-            //             res = char[Math.floor(koCode / 588)];
-            //         }
-            //         if(res === 'ㄱ' || res === 'ㄲ') {
-            //             res = 'ㄱ/ㄲ';
-            //         }
-            //         if(res === 'ㄷ' || res === 'ㄸ') {
-            //             res = 'ㄷ/ㄸ';
-            //         }
-            //         if(res === 'ㅂ' || res === 'ㅃ') {
-            //             res = 'ㅂ/ㅃ';
-            //         }
-            //         if(res === 'ㅅ' || res === 'ㅆ') {
-            //             res = 'ㅅ/ㅆ';
-            //         }
-            //         if(res === 'ㅈ' || res === 'ㅉ') {
-            //             res = 'ㅈ/ㅉ';
-            //         }
-            //         let sellerGroup = await getRepository(SellerGroup).createQueryBuilder('sg')
-            //             .leftJoinAndSelect('sg.seller', 's')
-            //             .where('sg.name = :name', { name: res })
-            //             .getOne();
-            //         let seller = await getRepository(Seller).createQueryBuilder('s')
-            //             .leftJoinAndSelect('s.sellerInfo', 'si')
-            //             .where('si.brandName = :brandName', { brandName: koBrandName })
-            //             .getOne();
-            //         let trimName = seller.sellerInfo.brandName.trim();
-            //         let firstName = seller.sellerInfo.brandName[0];
-            //         if(koRegex.test(firstName)) {
-            //             sellerGroup.seller.push(seller);
-            //             console.log(seller.sellerInfo.brandName)
-            //             await getRepository(SellerGroup).save(sellerGroup);
-            //         }
-            //     }
-            // }
-            // 국내 작가 한글 브랜드명
-            // for(let i = 0; i < bRow.length; i++) {
-            //     if(bRow[i].brandName != null) {
-            //         let brandName = bRow[i].brandName;
-            //         koCode = brandName.charAt(0);
-            //         res = enCode;
-            //         let seller = await getRepository(Seller).createQueryBuilder('s')
-            //             .leftJoinAndSelect('s.sellerInfo', 'si')
-            //             .where('si.brandName = :brandName', { brandName: brandName })
-            //             .getOne();
-            //         let sellerGroup = await getRepository(SellerGroup).createQueryBuilder('sg')
-            //             .leftJoinAndSelect('sg.seller', 's')
-            //             .where('sg.name = :name', { name: res })
-            //             .getOne();
-            //         let firstBrandName = seller.sellerInfo.brandName[0];
-            //         if(seller.registType === true && koRegex.test(firstBrandName) === true && seller.sellerInfo.brandName !== "") {
-            //             sellerGroup.seller.push(seller);
-            //             console.log(seller.sellerInfo.brandName)
-            //             await getRepository(SellerGroup).save(sellerGroup);
-            //         }
-            //     }
-            // }
-            // 해외 작가
-            // for(let i = 0; i < bRow.length; i++) {
-            //     if(bRow[i].englishBrandName != null) {
-            //         let brandName = bRow[i].englishBrandName;
-            //         enCode = brandName.charAt(0);
-            //         res = enCode;
-            //         let seller = await this.sellerRepository.getSellerByEnglishBrandName(brandName);
-            //         let sellerGroup = await getRepository(SellerGroup).createQueryBuilder('sg')
-            //             .leftJoinAndSelect('sg.seller', 's')
-            //             .where('sg.name = :name', { name: res })
-            //             .getOne();
-            //         let firstBrandName = seller.sellerInfo.englishBrandName[0];
-            //         if(seller.registType === false && enRegex.test(firstBrandName) === true && seller.sellerInfo.englishBrandName !== "") {
-            //             sellerGroup.seller.push(seller);
-            //             console.log(seller.sellerInfo.englishBrandName)
-            //             await getRepository(SellerGroup).save(sellerGroup);
-            //         }
-            //     }
-            // }
-            // 국내 작가 영문 브랜드명
-            // for(let i = 0; i < bRow.length; i++) {
-            //     if(bRow[i].brandName != null) {
-            //         let enBrandName = bRow[i].brandName;
-            //         enCode = enBrandName.charAt(0);
-            //         res = enCode;
-            //         let seller = await getRepository(Seller).createQueryBuilder('s')
-            //             .leftJoinAndSelect('s.sellerInfo', 'si')
-            //             .where('si.brandName = :brandName', { brandName: enBrandName })
-            //             .getOne();
-            //         let sellerGroup = await getRepository(SellerGroup).createQueryBuilder('sg')
-            //             .leftJoinAndSelect('sg.seller', 's')
-            //             .where('sg.name = :name', { name: res })
-            //             .getOne();
-            //         let firstBrandName = seller.sellerInfo.brandName[0];
-            //         if(seller.registType === true && enRegex.test(firstBrandName) === true && seller.sellerInfo.brandName !== "") {
-            //             sellerGroup.seller.push(seller);
-            //             console.log(seller.sellerInfo.brandName)
-            //             await getRepository(SellerGroup).save(sellerGroup);
-            //         }
-            //     }
-            // }
-            // let seller = await getRepository(Seller).createQueryBuilder('s')
-            //     .leftJoinAndSelect('s.sellerInfo', 'si')
-            //     .where('si.brandName = :brandName', { brandName: 'nyong-lab' })
-            //     .getOne();
-            //     console.log(seller.sellerInfo.brandName);
-            // let sellerGroup = await getRepository(SellerGroup).createQueryBuilder('sg')
-            //     .leftJoinAndSelect('sg.seller', 's')
-            //     .where('sg.name = :name', { name: 'n' })
-            //     .getOne();
-            // sellerGroup.seller.push(seller);
-            // await getRepository(SellerGroup).save(sellerGroup)
-            // return { "data" : data };
-        } catch (err) {
-            console.log(err);
         }
     }
 
@@ -582,11 +382,14 @@ export class SellersService {
         const bankAccountNumber = sellerInfo.bankAccount;
         let residentNumber = sellerInfo.residentNumber;
         let dencryptResidentNumber = null;
+        // 국내 셀러
         if (seller.registType == true) {
             dencryptResidentNumber = await this.sellerRepository.dencryptResidentNumber(residentNumber);
             dencryptResidentNumber =
                 typeof dencryptResidentNumber === 'string' ? dencryptResidentNumber : '';
-        } else {
+        }
+        // 해외 셀러
+        else {
             dencryptResidentNumber = residentNumber;
         }
         const dencryptPhoneNumber = await this.sellerRepository.dencryptPhone(phoneNumber);
@@ -596,13 +399,17 @@ export class SellersService {
             representativeName: null,
             businessName: null,
         };
-
+        let hashTag = await this.sellerHashtagRepository.getManyHashtags(sellerId);
+        let hashTags = [];
+        for (let i = 0; i < hashTag.length; i++) {
+            hashTags.push(hashTag[i].name);
+        }
+        // 팝빌 아이디가 존재하는 셀러
         if (sellerInfo.popbillChecked) {
             popbill.popbillId = popbillAccount.popbillId;
             popbill.representativeName = popbillAccount.representativeName;
             popbill.businessName = popbillAccount.businessName;
         }
-
         let res = {
             id: seller.id,
             email: seller.email,
@@ -611,11 +418,14 @@ export class SellersService {
             name: sellerInfo.name,
             residentNumber: dencryptResidentNumber,
             instagram: sellerInfo.instagram,
+            twitter: sellerInfo.twitter,
             brandName: sellerInfo.brandName,
             englishBrandName: sellerInfo.englishBrandName,
             brandStory: sellerInfo.brandStory,
             englishBrandStory: sellerInfo.englishBrandStory,
+            hashTag: hashTags,
             brandImage: sellerInfo.brandImage,
+            brandBackgroundImage: sellerInfo.brandBackgroundImage,
             depositor: sellerInfo.depositor,
             bankName: sellerInfo.bankName,
             bankAccount: dencryptAccountNumber,
@@ -629,25 +439,25 @@ export class SellersService {
             popbillChecked: sellerInfo.popbillChecked,
             popbill: popbill,
         };
-
         const tempProduct = await this.temporaryProductRepository.getTemporaryProduct(sellerId);
         const categoryId = tempProduct.category;
         let categoryInfo = null;
-
         if (categoryId != 0) {
             const categoryQuery = await this.categoryRepository.getCategory(categoryId);
             let categoryName = categoryQuery.categoryName;
             const isCategory = await this.categoryRepository.getCategoryByName(categoryName);
             const parent = isCategory.parent;
             const children = isCategory.categoryName;
-
+            // 2차 카테고리 존재
             if (parent) {
                 categoryInfo = {
                     id: categoryQuery.id,
                     firstCategory: parent.categoryName,
                     secondCategory: children,
                 };
-            } else {
+            }
+            // 1차 카테고리만 존재
+            else {
                 categoryInfo = {
                     id: categoryQuery.id,
                     firstCategory: children,
@@ -655,7 +465,6 @@ export class SellersService {
                 };
             }
         }
-
         const tempData = {
             prodName: tempProduct.prodName,
             englishProdName: tempProduct.englishProdName,
@@ -670,12 +479,10 @@ export class SellersService {
             sale: tempProduct.sale,
             category: categoryInfo,
         };
-
         let data = {
             tempData,
             res,
         };
-
         return data;
     }
 
@@ -685,7 +492,6 @@ export class SellersService {
         const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
         let phoneNumber = seller.phone;
         let dencryptPhoneNumber = await this.sellerRepository.dencryptPhone(phoneNumber);
-
         let res = {
             id: seller.id,
             email: seller.email,
@@ -703,18 +509,15 @@ export class SellersService {
             ledgerType: sellerInfo.ledgerType,
             ledgerEmail: sellerInfo.ledgerEmail,
         };
-
         const tempProduct = await this.temporaryProductRepository.getTemporaryProduct(sellerId);
         const categoryId = tempProduct.category;
         let categoryInfo = null;
-
         if (categoryId != 0) {
             const categoryQuery = await this.categoryRepository.getCategory(categoryId);
             let categoryName = categoryQuery.englishCategoryName;
             const isCategory = await this.categoryRepository.getCategoryByName(categoryName);
             const parent = isCategory.parent;
             const children = isCategory.englishCategoryName;
-
             if (parent) {
                 categoryInfo = {
                     id: categoryQuery.id,
@@ -729,7 +532,6 @@ export class SellersService {
                 };
             }
         }
-
         const tempData = {
             prodName: tempProduct.prodName,
             englishProdName: tempProduct.englishProdName,
@@ -744,12 +546,10 @@ export class SellersService {
             sale: tempProduct.sale,
             category: categoryInfo,
         };
-
         let data = {
             tempData,
             res,
         };
-
         return data;
     }
 
@@ -769,7 +569,7 @@ export class SellersService {
                     CorpNum: '4928701193',
                     CheckCorpNum: corNum,
                 },
-                (err, result) => {
+                (err: any, result: any) => {
                     if (result) {
                         let taxType = result.GetCorpStateResult.TaxType;
                         let state = result.GetCorpStateResult.State;
@@ -840,14 +640,12 @@ export class SellersService {
         let encryptResidentNumber = await this.sellerRepository.encryptResidentNumber(residentNumber);
         seller.phone = typeof encryptPhone === 'string' ? encryptPhone : '';
         await this.sellerRepository.save(seller);
-
         sellerInfo.name = name;
         sellerInfo.businessOption = BusinessOption.personal;
         sellerInfo.residentNumber = typeof encryptResidentNumber === 'string' ? encryptResidentNumber : '';
         sellerInfo.businessNumber = null;
         sellerInfo.seller = seller;
         await this.sellerInfoRepository.save(sellerInfo);
-
         sellerPopbillAccount.representativeName = null;
         sellerPopbillAccount.managerName = null;
         sellerPopbillAccount.businessName = null;
@@ -870,7 +668,6 @@ export class SellersService {
         let encryptResidentNumber = await this.sellerRepository.encryptResidentNumber(residentNumber);
         seller.phone = typeof encryptPhone === 'string' ? encryptPhone : '';
         await this.sellerRepository.save(seller);
-
         sellerInfo.name = name;
         sellerInfo.residentNumber = typeof encryptResidentNumber === 'string' ? encryptResidentNumber : '';
         sellerInfo.businessNumber = null;
@@ -900,177 +697,5 @@ export class SellersService {
         } catch {
             return { resultCode: -1, data: null };
         }
-    }
-
-    // 서비스 로직
-
-    async createLedgerData() {
-        const query = await this.sellerRepository.query();
-        query.select('MAX(s.id)', 'max');
-        const maxSeller = await query.getRawOne();
-        const sellerId = maxSeller.max;
-        const seller = await this.sellerRepository.getSeller(sellerId);
-        const sellerInfo = await this.sellerInfoRepository.getSellerInfo(sellerId);
-        const createdAt = new Date(seller.createdAt);
-        const saleYear = createdAt.getFullYear().toString();
-        const saleMonth = (createdAt.getMonth() + 2).toString();
-        const sellerLedger = await this.sellerLedgerRepository.create();
-        sellerLedger.saleYear = saleYear;
-        sellerLedger.saleMonth = saleMonth;
-        sellerLedger.seller = seller;
-        sellerLedger.feeRatio = sellerInfo.feeRatio;
-        sellerLedger.ledgerStatus = LedgerStatus.sale;
-
-        if (seller.registType == true) {
-            sellerLedger.currency = Currency.KRW;
-        } else {
-            sellerLedger.currency = Currency.USD;
-        }
-
-        await this.sellerLedgerRepository.save(sellerLedger);
-    }
-
-    async checkPopbillMember(body: any) {
-        const popbill = require('popbill');
-        popbill.config({
-            LinkID: 'NOUTECOMPANY',
-            SecretKey: 'GtxNHprG4JZfiCYQHxYOzK7VJ7TIA/JV+3feCKyOx0I=',
-            IsTest: false,
-            IPRestrictOnOff: true,
-            UseLocalTimeYN: true,
-            UseStaticIP: false,
-            defaultErrorHandler: function (Error) {
-                console.log('Error Occur : [' + Error.code + '] ' + Error.message);
-            },
-        });
-        try {
-            const accountCheckService = popbill.AccountCheckService();
-            let data = null;
-            let corpNum = body;
-            return new Promise((resolve, reject) => {
-                accountCheckService.checkIsMember(
-                    corpNum,
-                    function (result) {
-                        data = {
-                            result: result,
-                        };
-                        resolve(data);
-                    },
-                    function (Error) {
-                        data = {
-                            result: Error,
-                        };
-                        reject(Error);
-                    },
-                );
-            }).then((res) => {
-                return { resultCode: 1, data: data };
-            });
-        } catch (err) {
-            console.log(err);
-            return { resultCode: -1, data: null };
-        }
-    }
-
-    async getLedgerList(req: any, body: any): Promise<any> {
-        const sellerId = req.seller.sellerId;
-        const seller = await this.sellerRepository.getSeller(sellerId);
-        let data = null;
-        let sellerLedgerInfo = null;
-
-        if (seller.registType === true) {
-            sellerLedgerInfo = await this.sellerLedgerRepository.getSellerLedgerData(sellerId);
-        } else {
-            sellerLedgerInfo = await this.sellerLedgerRepository.getSellerEnglishLedgerData(sellerId);
-        }
-
-        let ledgerData = [];
-
-        for (let i = 0; i < sellerLedgerInfo.length; i++) {
-            let saleYear = null;
-            let saleMonth = null;
-
-            if (sellerLedgerInfo[i].saleMonth === '01') {
-                saleYear = Number(sellerLedgerInfo[i].saleYear) - 1;
-                saleMonth = 12;
-                saleYear = String(saleYear);
-                saleMonth = String(saleMonth);
-            } else {
-                saleYear = sellerLedgerInfo[i].saleYear;
-                saleMonth = Number(sellerLedgerInfo[i].saleMonth) - 1;
-                saleMonth = String(saleMonth);
-            }
-
-            if (sellerLedgerInfo[i].ledgerStatus === LedgerStatus.sale) {
-                ledgerData[i] = {
-                    saleYear: saleYear,
-                    saleMonth: saleMonth,
-                    ledgerYear: sellerLedgerInfo[i].saleYear,
-                    ledgerMonth: sellerLedgerInfo[i].saleMonth,
-                    saleAmount: sellerLedgerInfo[i].saleAmount,
-                    ledgerAmount: '-',
-                    ledgerStatus: sellerLedgerInfo[i].ledgerStatus,
-                };
-            } else {
-                ledgerData[i] = {
-                    saleYear: saleYear,
-                    saleMonth: saleMonth,
-                    ledgerYear: sellerLedgerInfo[i].saleYear,
-                    ledgerMonth: sellerLedgerInfo[i].saleMonth,
-                    saleAmount: sellerLedgerInfo[i].saleAmount,
-                    ledgerAmount: sellerLedgerInfo[i].ledgerAmount,
-                    ledgerStatus: sellerLedgerInfo[i].ledgerStatus,
-                };
-            }
-        }
-
-        let count = ledgerData.length;
-        const offset = (body + 1) * 4;
-        let resData = ledgerData.reverse();
-        resData = ledgerData.slice(body * 4, offset);
-
-        data = {
-            resData,
-            count,
-        };
-
-        return data;
-    }
-
-    async getLedgerExcelData(req: any): Promise<any> {
-        const sellerId = req.seller.sellerId;
-        console.log(sellerId);
-        const query = await this.sellerLedgerRepository.getSellerConfirmedLedgerData(sellerId);
-        let data = [];
-        let res = {};
-
-        for (let i = 0; i < query.length; i++) {
-            let saleYear = null;
-            let saleMonth = null;
-
-            if (query[i].saleMonth === '01') {
-                saleYear = Number(query[i].saleYear) - 1;
-                saleMonth = 12;
-                saleYear = String(saleYear);
-                saleMonth = String(saleMonth);
-            } else {
-                saleYear = query[i].saleYear;
-                saleMonth = Number(query[i].saleMonth) - 1;
-                saleMonth = String(saleMonth);
-            }
-
-            data[i] = {
-                saleYear: saleYear,
-                saleMonth: saleMonth,
-                ledgerYear: query[i].saleYear,
-                ledgerMonth: query[i].saleMonth,
-                ledgerAmount: query[i].ledgerAmount,
-                ledgerStatus: query[i].ledgerStatus,
-            };
-
-            res = data[i];
-        }
-
-        return res;
     }
 }
