@@ -14,9 +14,9 @@ import { SellerInfoRepository } from 'src/repository/sellerInfo.repository';
 import { SellerPopbillAccountRepository } from 'src/repository/sellerPopbillAccount.repository';
 import { Category } from 'src/entity/Category.entity';
 import { CategoryRepository } from 'src/repository/Category.repository';
-import { SellerLedger } from 'src/entity/SellerLedger.entity';
-import { SellerLedgerRepository } from 'src/repository/SellerLedger.repository';
 import { SellerFileRepository } from 'src/repository/sellerFile.repository';
+import { SellerHashTag } from 'src/entity/SellerHashTag.entity';
+import { SellerHashtagRepository } from 'src/repository/sellerHashtag.repository';
 
 @Module({
     imports: [
@@ -26,7 +26,7 @@ import { SellerFileRepository } from 'src/repository/sellerFile.repository';
             SellerInfo,
             SellerPopbillAccount,
             SellerFile,
-            SellerLedger,
+            SellerHashTag,
             Category,
             TemporaryProduct,
         ]),
@@ -38,7 +38,7 @@ import { SellerFileRepository } from 'src/repository/sellerFile.repository';
         SellerInfoRepository,
         SellerPopbillAccountRepository,
         SellerFileRepository,
-        SellerLedgerRepository,
+        SellerHashtagRepository,
         CategoryRepository,
         TemporaryProductRepository,
     ],

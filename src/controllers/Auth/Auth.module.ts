@@ -16,6 +16,8 @@ import { SellerInfoRepository } from 'src/repository/sellerInfo.repository';
 import { SellerPopbillAccountRepository } from 'src/repository/sellerPopbillAccount.repository';
 import { SellerMinorFileRepository } from 'src/repository/sellerMinorFile.repository';
 import { TemporaryProductRepository } from 'src/repository/temporaryProduct.repository';
+import { SellerHashTag } from 'src/entity/SellerHashTag.entity';
+import { SellerHashtagRepository } from 'src/repository/sellerHashtag.repository';
 
 @Module({
     imports: [
@@ -26,6 +28,7 @@ import { TemporaryProductRepository } from 'src/repository/temporaryProduct.repo
             SellerPopbillAccount,
             SellerFile,
             SellerMinorFile,
+            SellerHashTag,
             TemporaryProduct,
         ]),
     ],
@@ -38,6 +41,7 @@ import { TemporaryProductRepository } from 'src/repository/temporaryProduct.repo
         SellerPopbillAccountRepository,
         SellerFileRepository,
         SellerMinorFileRepository,
+        SellerHashtagRepository,
         TemporaryProductRepository,
     ],
     exports: [AuthService],

@@ -36,4 +36,20 @@ export class CategoryRepository {
     async getFirstCategoryList(): Promise<any> {
         return await this.categoryRepository.createQueryBuilder('c').where('c.parentId IS NULL').getMany();
     }
+
+    async getTemplateRowAndCategory(body: any): Promise<any> {
+        return await this.categoryRepository
+            .createQueryBuilder('c')
+            .leftJoinAndSelect('c.row', 'r')
+            .where('c.id = :body', { body: body })
+            .getOne();
+    }
+
+    async getFirstCategoryAndRow(): Promise<any> {
+        return await this.categoryRepository
+            .createQueryBuilder('c')
+            .leftJoinAndSelect('c.row', 'r')
+            .where('c.parentId is null')
+            .getMany();
+    }
 }

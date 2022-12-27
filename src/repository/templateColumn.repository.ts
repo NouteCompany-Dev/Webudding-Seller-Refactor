@@ -30,4 +30,12 @@ export class TemplateColumnRepository {
             .where('p.id = :body', { body: body })
             .getMany();
     }
+
+    async getTemplateColumnList(body: any): Promise<any> {
+        return await this.templateColumnRepository
+            .createQueryBuilder('tc')
+            .leftJoinAndSelect('tc.row', 'tr')
+            .where('tr.id = :body', { body: body })
+            .getMany();
+    }
 }

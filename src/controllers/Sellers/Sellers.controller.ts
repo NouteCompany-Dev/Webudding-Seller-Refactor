@@ -301,16 +301,6 @@ export class SellersController {
         }
     }
 
-    @Get('groupSellers')
-    async GroupSeller(@Req() req: Request) {
-        try {
-            const result = await this.sellersService.groupingSeller(req);
-            return result;
-        } catch (err) {
-            return { data: null };
-        }
-    }
-
     @Post('check/resident')
     async checkResident(@Req() req: Request, @Body() body: any, @Res() res: Response) {
         try {

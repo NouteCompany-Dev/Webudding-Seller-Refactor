@@ -29,6 +29,7 @@ import { ProductSupportComment } from './ProductSupportComment.entity';
 import { SellerPopbillAccount } from './SellerPopbillAccount.entity';
 import { SellerLiked } from './SellerLiked.entity';
 import { SellerStatus } from './enum/enum';
+import { SellerHashTag } from './SellerHashTag.entity';
 
 @Entity({ name: 'Sellers' })
 export class Seller {
@@ -137,6 +138,9 @@ export class Seller {
 
     @OneToOne(() => TemporaryProduct, (temp) => temp.seller, { cascade: true })
     temp: TemporaryProduct;
+
+    @OneToMany(() => SellerHashTag, (hashtag) => hashtag.seller, { cascade: true })
+    sellerHashTag?: SellerHashTag[];
 
     constructor(partial: Partial<Seller>) {
         Object.assign(this, partial);

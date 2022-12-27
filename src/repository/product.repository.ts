@@ -10,6 +10,10 @@ export class ProductRepository {
         private productRepository: Repository<Product>,
     ) {}
 
+    query() {
+        return this.productRepository.createQueryBuilder('p');
+    }
+
     async create() {
         return this.productRepository.create();
     }
@@ -96,69 +100,5 @@ export class ProductRepository {
 
     async changeToFree(req: any): Promise<any> {
         return await this.productRepository.createQueryBuilder('p').where('p.price = 0').getCount();
-    }
-
-    async getProductList(req: any, body: any): Promise<any> {
-        const { categoryId, search, searchOption } = body;
-        const sellerId = req.seller.sellerId;
-        let pData = [];
-        let prodData = [];
-        let items = [];
-        let items2 = [];
-
-        for (let i = 0; i < categoryId.length; i++) {
-            let idx = categoryId[i];
-            let prodQuery = this.productRepository
-                .createQueryBuilder('p')
-                .leftJoinAndSelect('p.category', 'pc')
-                .leftJoinAndSelect('p.thumb', 'pt')
-                .where('p.categoryId = :idx', { idx: idx })
-                .andWhere('p.sellerId = :sellerId', { sellerId: sellerId });
-
-            if (search) {
-                if (searchOption == 'name') {
-                    prodQuery.andWhere('p.productName like :search', { search: `%${search}%` });
-                } else if (searchOption == 'sku') {
-                    prodQuery.andWhere('p.skuId like :search', { search: `%${search}%` });
-                }
-            }
-
-            let prodResult = await prodQuery.getMany();
-
-            for (let j = 0; j < prodResult.length; j++) {
-                prodData.push(prodResult[j]);
-            }
-
-            let pQuery = this.productRepository
-                .createQueryBuilder('p')
-                .leftJoinAndSelect('p.category', 'pc')
-                .leftJoinAndSelect('p.thumb', 'pt')
-                .leftJoinAndSelect('pc.parent', 'pcp')
-                .andWhere('pcp.id = :idx', { idx })
-                .andWhere('p.sellerId = :sellerId', { sellerId });
-
-            if (search) {
-                if (searchOption == 'name') {
-                    pQuery.andWhere('p.productName like :search', { search: `%${search}%` });
-                } else if (searchOption == 'sku') {
-                    pQuery.andWhere('p.skuId like :search', { search: `%${search}%` });
-                }
-            }
-
-            let pResult = await pQuery.getMany();
-
-            for (let j = 0; j < pResult.length; j++) {
-                pData.push(pResult[j]);
-            }
-        }
-
-        const data = {
-            pData: pData,
-            prodData: prodData,
-            items: items,
-            items2: items2,
-        };
-
-        return data;
     }
 }

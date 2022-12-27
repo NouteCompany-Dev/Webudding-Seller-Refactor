@@ -160,6 +160,9 @@ export class AuthController {
                     name: 'profile', //브랜드 이미지
                 },
                 {
+                    name: 'backProfile', //브랜드 배경 이미지
+                },
+                {
                     name: 'certificate', //법인인감증명서
                 },
                 {
